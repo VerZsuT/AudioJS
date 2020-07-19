@@ -2,20 +2,23 @@ class AudioJS {
     #queue = []
     #audio = new Audio()
     #index = 0
+    #intervalId = null
     #autoplay = false
     #loopTrack = false
     #loopQueue = false
     #status = 'created'
     #events = {
-        'queueEnd': () => {},
-        'trackPlay': () => {},
-        'trackPause': () => {},
-        'trackStop': () => {},
-        'trackEnd': () => {
+        queueEnd: () => {},
+        trackLoad: () => {},
+        trackPlay: () => {},
+        trackPause: () => {},
+        trackStop: () => {},
+        trackEnd: () => {
             if (this.#autoplay) {
                 this.next()
             }
-        }
+        },
+        changeTime: null,
     }
 
     constructor(param=null) {
@@ -34,13 +37,18 @@ class AudioJS {
         }
 
         this.#audio.onended = () => {
+            clearInterval(this.#intervalId)
+            this.#events.trackEnd()
             if (this.#loopTrack) {
                 this.play()
             }
-            this.#events.trackEnd()
         }
+        this.#audio.onloadeddata = () => {
+            this.#events.trackLoad()
+        }
+
     }
-    
+
     // Проиграть
     play = (param=null) => {
         if (param !== null) {
@@ -54,6 +62,12 @@ class AudioJS {
         this.#audio.play()
         this.#status = 'playing'
         this.#events.trackPlay()
+        if (this.#events.changeTime) {
+            this.#events.changeTime()
+            this.#intervalId = setInterval(() => {
+                this.#events.changeTime()
+            }, 1000)
+        }
     }
 
     // Поставить на паузу
@@ -61,6 +75,7 @@ class AudioJS {
         this.#audio.pause()
         this.#status = 'paused'
         this.#events.trackPause()
+        clearInterval(this.#intervalId)
     }
 
     // Остановить
@@ -69,6 +84,7 @@ class AudioJS {
         this.#status = 'stoped'
         this.#audio.currentTime = 0
         this.#events.trackStop()
+        clearInterval(this.#intervalId)
     }
 
     // Запустить следующее в очереди
@@ -111,7 +127,7 @@ class AudioJS {
 
     // Текущее время проигрывания
     get time() {
-        return this.#audio.currentTime
+        return Math.round(this.#audio.currentTime)
     }
     set time(value) {
         if (this.#isNumber(value)) {
@@ -220,15 +236,14 @@ class AudioJS {
 
     // Приватные функции
     #unpackParams = (object) => {
-        this.#index = this.#isNumber(object.index) && object.index
+        this.index = object.index
         this.autoplay = object.autoplay
         this.loopTrack = object.loopTrack
         this.loopQueue = object.loopQueue
         this.volume = object.volume
         this.preload = object.preload
-        this.time = object.time
-        this.queue = object.queue
-        this.queue = this.#isString(object.src) && [object.src]
+        this.time = object.time || this.time
+        this.queue = this.#isString(object.src) && [object.src] || object.queue
     }
 
     #unpackEvents = (object) => {
@@ -237,6 +252,8 @@ class AudioJS {
         this.#events.trackPause = object.onTrackPause || this.#events.trackPause
         this.#events.trackStop = object.onTrackStop || this.#events.trackStop
         this.#events.trackEnd = object.onTrackEnd || this.#events.trackEnd
+        this.#events.trackLoad = object.onTrackLoad || this.#events.trackLoad
+        this.#events.changeTime = object.onChangeTime || this.#events.changeTime
     }
 
     #hasNextQueue = () => {
