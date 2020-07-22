@@ -39,13 +39,13 @@ class AudioJS {
 
         this.#audio.onended = () => {
             clearInterval(this.#intervalId)
-			if (this.#loopTrack) {
+	    if (this.#loopTrack) {
                 this.play()
             } else {
-				if (this.#autoplay) {
-					this.next()
-				}
-			}
+		if (this.#autoplay) {
+		    this.next()
+		}
+	    }
             this.#events.trackEnd()
         }
         this.#audio.onloadeddata = () => {
