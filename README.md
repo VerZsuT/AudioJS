@@ -47,7 +47,7 @@ let audiojs = new AudioJS({
   autoplay: true,                      // Автопроигрывание.
   onQueueEnd: function() {             // Подписка на событие окончания очереди.
     console.log('Первая очередь закончилась.')
-    audio.queue = ['URL4', 'URL5']     // Запускаем вторую очередь.
+    audiojs.queue = ['URL4', 'URL5']     // Запускаем вторую очередь.
   }
 })
 ```
