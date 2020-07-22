@@ -1,9 +1,9 @@
 class AudioJS {
-	static statusType = {
-		created: 0,
-		playing: 1,
-		paused: 2
-	}
+    static statusType = {
+	created: 0,
+	playing: 1,
+	paused: 2
+    }
     #queue = []
     #audio = new Audio()
     #index = 0
@@ -18,11 +18,7 @@ class AudioJS {
         trackPlay: () => {},
         trackPause: () => {},
         trackStop: () => {},
-        trackEnd: () => {
-            if (this.#autoplay) {
-                this.next()
-            }
-        },
+        trackEnd: () => {},
         changeTime: null,
     }
 
@@ -43,10 +39,14 @@ class AudioJS {
 
         this.#audio.onended = () => {
             clearInterval(this.#intervalId)
-            this.#events.trackEnd()
-            if (this.#loopTrack) {
+			if (this.#loopTrack) {
                 this.play()
-            }
+            } else {
+				if (this.#autoplay) {
+					this.next()
+				}
+			}
+            this.#events.trackEnd()
         }
         this.#audio.onloadeddata = () => {
             this.#events.trackLoad()
@@ -119,7 +119,7 @@ class AudioJS {
 
     // Подписка на события
     on = (event, callback, root=false) => {
-        if (root) {
+        if (!root) {
             let rootCallback = this.#events[event]
             this.#events[event] = () => {
                 rootCallback()
