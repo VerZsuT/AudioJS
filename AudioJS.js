@@ -1,4 +1,9 @@
 class AudioJS {
+	static statusType = {
+		created: 0,
+		playing: 1,
+		paused: 2
+	}
     #queue = []
     #audio = new Audio()
     #index = 0
@@ -6,7 +11,7 @@ class AudioJS {
     #autoplay = false
     #loopTrack = false
     #loopQueue = false
-    #status = 'created'
+    #status = AudioJS.statusType.created
     #events = {
         queueEnd: () => {},
         trackLoad: () => {},
@@ -60,7 +65,7 @@ class AudioJS {
             }
         }
         this.#audio.play()
-        this.#status = 'playing'
+        this.#status = AudioJS.statusType.playing
         this.#events.trackPlay()
         if (this.#events.changeTime) {
             this.#events.changeTime()
@@ -73,7 +78,7 @@ class AudioJS {
     // Поставить на паузу
     pause = () => {
         this.#audio.pause()
-        this.#status = 'paused'
+        this.#status = AudioJS.statusType.paused
         this.#events.trackPause()
         clearInterval(this.#intervalId)
     }
@@ -81,7 +86,7 @@ class AudioJS {
     // Остановить
     stop = () => {
         this.#audio.pause()
-        this.#status = 'stoped'
+        this.#status = AudioJS.statusType.paused
         this.#audio.currentTime = 0
         this.#events.trackStop()
         clearInterval(this.#intervalId)
