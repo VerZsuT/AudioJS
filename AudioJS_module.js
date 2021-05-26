@@ -1,4 +1,6 @@
-class AudioJS {
+/// <reference path="./AudioJS.d.ts">
+
+export default class AudioJS {
     static statusType = {
         created: 'created',
         playing: 'playing',
@@ -48,7 +50,6 @@ class AudioJS {
             }
             this.#events.trackEnd()
         }
-
         this.#audio.onloadeddata = () => {
             this.#events.trackLoad()
         }
@@ -283,10 +284,6 @@ class AudioJS {
 
     #isNumber = (value) => {
         return typeof value == 'number'
-    }
-
-    #isFunction = (value) => {
-        return typeof value == 'function'
     }
 
     #isBoolean = (value) => {
