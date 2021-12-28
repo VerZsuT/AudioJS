@@ -1,74 +1,112 @@
-enum StatusType {
+export type AudioPreload = ''|'none'|'metadata'|'auto'
+
+export enum StatusType {
+    /** Объект AudioJS был создан */
     created,
+    /** Идёт проигрывание трека */
     playing,
+    /** Трек остановлен */
     paused
 }
 
-interface AudioJSEvents {
-    queueEnd: Function
-    trackLoad: Function
-    trackPlay: Function
-    trackPause: Function
-    trackStop: Function
-    trackEnd: Function
-    changeTime: Function
-}
-
-interface AudioJSParams {
+export interface TrackData {
     src: string
     index: number
-    autoplay: boolean
-    loopTrack: boolean
-    loopQueue: boolean
-    volume: number
-    preload: string
-    time: number
-    queue: Array<string>
-    onQueueEnd: Function
-    onTrackLoad: Function
-    onTrackPlay: Function
-    onTrackPause: Function
-    onTrackStop: Function
-    onTrackEnd: Function
-    onChangeTime: Function
+    duration: number
 }
 
-export default class AudioJS {
-    _queue: Array<string> = []
-    _audio: HTMLAudioElement = new Audio()
-    _index: number = 0
-    _intervalId: number = null
-    _autoplay: boolean = false
-    _loopTrack: boolean = false
-    _loopQueue: boolean = false
-    _status: StatusType = StatusType.created
-    _events: AudioJSEvents = {
-        queueEnd: () => {},
-        trackLoad: () => {},
-        trackPlay: () => {},
-        trackPause: () => {},
-        trackStop: () => {},
-        trackEnd: () => {},
-        changeTime: null,
+export interface AudioObjectEvents {
+    /** Вызывается при окончании очереди */
+    onQueueEnd?: (endedTrack: TrackData, prevTrack: TrackData, nextTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при загрузке трека */
+    onTrackLoad?: (loadedTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при запуске трека */
+    onTrackPlay?: (currentTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при постановке трека на паузу */
+    onTrackPause?: (currentTrack: TrackData, currentTime: number, audioJS: AudioJS) => any
+    /** Вызывается при остановке трека */
+    onTrackStop?: (currentTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при окончании трека */
+    onTrackEnd?: (endedTrack: TrackData, prevTrack: TrackData, nextTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается каждую секунду если трек проигрывается */
+    onChangeTime?: (currentTime: number, currentTrack: TrackData, audioJS: AudioJS) => any
+}
+
+export interface AudioFunctionEvents {
+    /** Вызывается при окончании очереди */
+    queueEnd?: (endedTrack: TrackData, prevTrack: TrackData, nextTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при загрузке трека */
+    trackLoad?: (loadedTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при запуске трека */
+    trackPlay?: (currentTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при постановке трека на паузу */
+    trackPause?: (currentTrack: TrackData, currentTime: number, audioJS: AudioJS) => any
+    /** Вызывается при остановке трека */
+    trackStop?: (currentTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается при окончании трека */
+    trackEnd?: (endedTrack: TrackData, prevTrack: TrackData, nextTrack: TrackData, audioJS: AudioJS) => any
+    /** Вызывается каждую секунду если трек проигрывается */
+    changeTime?: (currentTime: number, currentTrack: TrackData, audioJS: AudioJS) => any
+}
+
+export interface AudioParams {
+    /** URL трека */
+    src?: string
+    /** Индекс первого проигрываемого трека */
+    index?: number
+    /** Автозапуск трека */
+    autoplay?: boolean
+    /** Зацикливать ли трек */
+    loopTrack?: boolean
+    /** Зацикливать ли очередь */
+    loopQueue?: boolean
+    /** Громкость, от 0 до 1 */
+    volume?: number
+    /** Предзагрузка трека */
+    preload?: AudioPreload
+    /** Время запуска первого трека */
+    time?: number
+    /** Очередь */
+    queue?: Array<string>
+}
+
+export class AudioJS {
+    private audio = new Audio()
+    private intervalId = null
+    private _queue: string[] = []
+    private _index = 0
+    private _autoplay = false
+    private _loopTrack = false
+    private _loopQueue = false
+    private _status: StatusType = StatusType.created
+    private events: AudioObjectEvents = {
+        onQueueEnd: () => {},
+        onTrackLoad: () => {},
+        onTrackPlay: () => {},
+        onTrackPause: () => {},
+        onTrackStop: () => {},
+        onTrackEnd: () => {},
+        onChangeTime: null,
     }
 
-    constructor(params?: (string | Array<string> | AudioJSParams)) {
+    constructor(params?: string | string[] | AudioParams&AudioObjectEvents) {
         if (params) {
-            if (this._isString(params)) {
-                let audioURL = <string>params
+            if (typeof params === 'string') {
+                let audioURL = params
                 this.queue = [audioURL]
-            } else if (this._isArray(params)) {
-                let queue = <Array<string>>params
+            } else if (params instanceof Array) {
+                let queue = params
                 this.queue = queue
-            } else if (this._isObject(params)) {
-                let object = <AudioJSParams>params
-                this._unpackParams(object)
-                this._unpackEvents(object)
+            } else {
+                let object = params
+                this.unpackParams(object)
+                this.unpackEvents(object)
             }
         }
 
-        this._audio.onended = () => {
-            clearInterval(this._intervalId)
+        this.audio.onended = () => {
+            clearInterval(this.intervalId)
+            this.events.onTrackEnd(this.currentTrack, this.prevTrack, this.nextTrack, this)
             if (this._loopTrack) {
                 this.play()
             } else {
@@ -76,112 +114,130 @@ export default class AudioJS {
                     this.next()
                 }
             }
-            this._events.trackEnd()
         }
-        this._audio.onloadeddata = () => {
-            this._events.trackLoad()
+        this.audio.onloadeddata = () => {
+            this.events.onTrackLoad(this.currentTrack, this)
         }
-
     }
 
-    // Проиграть
-    play = (param?: (string | number)) => {
-        if (param) {
-            if (this._isString(param)) {
-                this._audio.src = <string>param
-            } else if (this._isNumber(param)) {
-                this._audio.src = this._queue[param]
-                this._index = <number>param
+    /**
+     * Проиграть трек
+     * @param param SRC аудио или номер в очереди
+    */
+    play = async (param?: string | number) => {
+        if (this._status === StatusType.playing) {
+            this.stop()
+        }
+        if (param !== undefined) {
+            if (typeof param === 'string') {
+                this.audio.src = param
+            } else {
+                this.audio.src = this._queue[param]
+                this._index = param
             }
         }
-        this._audio.play()
+        await this.audio.play()
         this._status = StatusType.playing
-        this._events.trackPlay()
-        if (this._events.changeTime) {
-            this._events.changeTime()
-            this._intervalId = setInterval(() => {
-                this._events.changeTime()
+        this.events.onTrackPlay(this.currentTrack, this)
+        if (this.events.onChangeTime) {
+            this.events.onChangeTime(this.time, this.currentTrack, this)
+            this.intervalId = setInterval(() => {
+                this.events.onChangeTime(this.time, this.currentTrack, this)
             }, 1000)
         }
     }
 
-    // Поставить на паузу
+    /** Поставить на паузу */
     pause = () => {
-        this._audio.pause()
+        this.audio.pause()
         this._status = StatusType.paused
-        this._events.trackPause()
-        clearInterval(this._intervalId)
+        this.events.onTrackPause(this.currentTrack, this.time, this)
+        clearInterval(this.intervalId)
     }
 
-    // Остановить
+    /** Остановить проигрывание */
     stop = () => {
-        this._audio.pause()
+        this.audio.pause()
         this._status = StatusType.paused
-        this._audio.currentTime = 0
-        this._events.trackStop()
-        clearInterval(this._intervalId)
+        this.audio.currentTime = 0
+        this.events.onTrackStop(this.currentTrack, this)
+        clearInterval(this.intervalId)
     }
 
-    // Запустить следующее в очереди
-    // (Запустить первый если стоит цикл очереди и текущий индекс - последний)
-    next = () => {
-        if (this._hasNextQueue()) {
-            this.stop()
-            this._audio.src = this._queue[++this._index]
-            if (this._autoplay) {
-                this.play()
-            }
+    /** Запустить следующий трек в очереди */
+    next = async () => {
+        this.stop()
+        if (this._queue[this._index+1]) {
+            this.play(this._index+1)
         } else if (this._loopQueue) {
-            this.play(0)
-        }
-    }
-
-    // Запустить предыдущее в очереди
-    back = () => {
-        if (this._queue[this._index - 1]) {
-            this.stop()
-            this._audio.src = this._queue[--this._index]
-            if (this._autoplay) {
-                this.play()
-            }
-        }
-    }
-
-    // Подписка на события
-    on = (event: keyof AudioJSEvents, callback: Function, root?: boolean) => {
-        if (!root) {
-            const rootCallback = this._events[event]
-            this._events[event] = () => {
-                if (rootCallback) {
-                    rootCallback()
-                }
-                callback()
-            }
+            this.events.onQueueEnd(this.currentTrack, this.prevTrack, this.nextTrack, this)
+            await this.play(0)
         } else {
-            this._events[event] = callback
+            await this.play()
         }
     }
 
-    // Текущее время проигрывания
+    /** Запустить предыдущий трек в очереди */
+    back = async () => {
+        this.stop()
+        if (this._queue[this._index-1]) {
+            await this.play(this._index-1)
+        } else if (this._loopQueue) {
+            await this.play(this._queue.length-1)
+        } else {
+            await this.play()
+        }
+    }
+
+    /** Подписка на события */
+    on = (event: keyof AudioFunctionEvents, callback: AudioFunctionEvents[typeof event]) => {
+        const eventName = `on${event[0].toUpperCase()}${event.slice(1)}`
+        const rootCallback = this.events[eventName]
+
+        this.events[eventName] = (...args: any[]) => {
+            if (rootCallback) {
+                rootCallback.apply(null, args)
+            }
+            callback.apply(null, args)
+        }
+    }
+
+    
+    /** Подписка на события */
+    once = (event: keyof AudioFunctionEvents, callback: AudioFunctionEvents[typeof event]) => {
+        const eventName = `on${event[0].toUpperCase()}${event.slice(1)}`
+        const root = this.events[eventName]
+
+        this.events[eventName] = (...args: any[]) => {
+            root.apply(null, args)
+            callback.apply(null, args)
+            // @ts-ignore
+            this.events[eventName] = root
+        }
+    }
+
+    /** Текущее время проигрывания */
     get time() {
-        return Math.round(this._audio.currentTime)
+        return Math.round(this.audio.currentTime)
     }
     set time(value: number) {
-        this._audio.currentTime = value
+        this.audio.currentTime = value
     }
 
-    // Другое
+    /** Длительность текущего трека */
     get duration() {
-        return this._audio.duration
+        return this.audio.duration
     }
+    /** Статус проигрывания */
     get status() {
         return this._status
     }
+    /** Выключен ли звук */
     get muted() {
-        return this._audio.muted
+        return this.audio.muted
     }
 
-    // Источник
+    /** SRC текущего трека */
     get src() {
         return this._queue[this._index]
     }
@@ -189,49 +245,49 @@ export default class AudioJS {
         this.queue = [value]
     }
 
-    // Предзагрузка
+    /** Предзагрузка аудио */
     get preload() {
-        return this._audio.preload
+        return this.audio.preload
     }
-    set preload(value: string) {
-        this._audio.preload = value
+    set preload(value: ''|'none'|'metadata'|'auto') {
+        this.audio.preload = value
     }
 
-    // Громкость
+    /** Громкость аудио */
     get volume() {
-        return this._audio.volume
+        return this.audio.volume
     }
     set volume(value: number) {
-        this._audio.volume = value
+        this.audio.volume = value
     }
 
-    // Очередь
+    /** Очередь проигрывания */
     get queue() {
         return this._queue
     }
-    set queue(value: Array<string>) {
+    set queue(value: string[]) {
         this._queue = value
-        this._audio.src = value[this._index]
+        this.audio.src = value[this._index]
         if (this._autoplay) {
             this.play()
         }
     }
 
-    // Индекс
+    /** Индекс текущего трека в очереди */
     get index() {
         return this._index
     }
     set index(value: number) {
         if (this._queue[value]) {
             this._index = value
-            this._audio.src = this._queue[value]
+            this.audio.src = this._queue[value]
             if (this._autoplay) {
-                this._audio.play()
+                this.audio.play()
             }
         }
     }
 
-    // Цикл трека
+    /** Зацикливать ли трек */
     get loopTrack() {
         return this._loopTrack
     }
@@ -239,7 +295,7 @@ export default class AudioJS {
         this._loopTrack = value
     }
 
-    // Цикл очереди
+    /** Зацикливать ли очередь */
     get loopQueue() {
         return this._loopQueue
     }
@@ -247,7 +303,7 @@ export default class AudioJS {
         this._loopQueue = value
     }
 
-    // Автопроигрывание
+    /** Автопроигрывание трека */
     get autoplay() {
         return this._autoplay
     }
@@ -255,50 +311,68 @@ export default class AudioJS {
         this._autoplay = value
     }
 
-    // Приватные функции
-    _unpackParams = (object: AudioJSParams) => {
-        this.index = object.index
-        this.autoplay = object.autoplay
-        this.loopTrack = object.loopTrack
-        this.loopQueue = object.loopQueue
-        this.volume = object.volume
-        this.preload = object.preload
-        this.time = object.time || this.time
-        this.queue = (this._isString(object.src) && [object.src]) || object.queue
+    private unpackParams = (object: AudioParams&AudioObjectEvents) => {
+        this.index = object.index ?? 0
+        this.autoplay = object.autoplay ?? false
+        this.loopTrack = object.loopTrack ?? false
+        this.loopQueue = object.loopQueue ?? false
+        this.volume = object.volume ?? 1
+        this.preload = object.preload ?? 'none'
+        this.time = object.time ?? this.time
+        this.queue = object.queue ?? [object.src]
     }
 
-    _unpackEvents = (object: AudioJSParams) => {
-        this._events.queueEnd = object.onQueueEnd || this._events.queueEnd
-        this._events.trackPlay = object.onTrackPlay || this._events.trackPlay
-        this._events.trackPause = object.onTrackPause || this._events.trackPause
-        this._events.trackStop = object.onTrackStop || this._events.trackStop
-        this._events.trackEnd = object.onTrackEnd || this._events.trackEnd
-        this._events.trackLoad = object.onTrackLoad || this._events.trackLoad
-        this._events.changeTime = object.onChangeTime || this._events.changeTime
-    }
-
-    _hasNextQueue = () => {
-        if (this._queue[this._index + 1]) {
-            return true
-        } else {
-            this._events.queueEnd()
-            return false
+    private get currentTrack(): TrackData {
+        return {
+            src: this.src,
+            duration: this.duration,
+            index: this.index
         }
     }
 
-    _isArray = (value: any) => {
-        return value instanceof Array
+    private get prevTrack(): TrackData {
+        if (this.queue[this.index-1]) {
+            return {
+                src: this.queue[this.index-1],
+                duration: undefined,
+                index: this.index-1
+            }
+        } else if (this.loopQueue) {
+            return {
+                src: this.queue[this.queue.length-1],
+                duration: this.queue.length === 1? this.duration : undefined,
+                index: this.queue.length-1
+            }
+        } else {
+            return null
+        }
     }
 
-    _isString = (value: any) => {
-        return typeof value == 'string'
+    private get nextTrack(): TrackData {
+        if (this.queue[this.index+1]) {
+            return {
+                src: this.queue[this.index+1],
+                duration: undefined,
+                index: this.index+1
+            }
+        } else if (this.loopQueue) {
+            return {
+                src: this.queue[0],
+                duration: this.queue.length === 1? this.duration : undefined,
+                index: 0
+            }
+        } else {
+            return null
+        }
     }
 
-    _isNumber = (value: any) => {
-        return typeof value == 'number'
-    }
-
-    _isObject = (value: any) => {
-        return typeof value == 'object'
+    private unpackEvents = (object: AudioParams&AudioObjectEvents) => {
+        this.events.onQueueEnd = object.onQueueEnd ?? (()=>{})
+        this.events.onTrackPlay = object.onTrackPlay ?? (()=>{})
+        this.events.onTrackPause = object.onTrackPause ?? (()=>{})
+        this.events.onTrackStop = object.onTrackStop ?? (()=>{})
+        this.events.onTrackEnd = object.onTrackEnd ?? (()=>{})
+        this.events.onTrackLoad = object.onTrackLoad ?? (()=>{})
+        this.events.onChangeTime = object.onChangeTime ?? null
     }
 }
