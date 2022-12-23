@@ -1,182 +1,91 @@
 # AudioJS
 
-Небольшая библиотека для удобной работы с HTML аудио.
-Представляет собой класс-обёртку над стандартным классом _Audio_.
+Library for working with HTML Audio.
 
-## Установка
+_Full ts support._
 
-Чтобы использовать **AudioJS** достаточно скачать файл _AudioJS.js_ либо скопировать код и поключить его к странице.
+## Installation
 
-*AudioJS.js* - для подключения в качестве модуля.
-*AudioJS.ts* - TypeScript-версия.
-
-## Пример использования
-
-В данном примере мы запустим очередь из нескольких аудиофайлов. Для этого достаточно создать экземпляр класса **AudioJS** и передать в его конструктор массив с URL-ми файлов, которые будут проигрываться:
-
-```js
-let audiojs = new AudioJS(['URL1', 'URL2'])
-audiojs.play()
+```npm
+npm i vzt-audio
 ```
 
-В таком случае файлы в очереди не будут автоматически переключаться, нам придётся это делать вручную:
+## Example
+
+Create a queue:
 
 ```js
-audiojs.play(1)
+import { AudioJS } from 'vzt-audio'
+
+const audiojs = new AudioJS(['URL1', 'URL2'])
+
+// OR
+const audiojs = new AudioJS([
+  { src: 'URL1', name: 'First track' },
+  { src: 'URL2', name: 'Second track' }
+])
+
+// OR
+const audiojs = new AudioJS({
+  queue: [
+    { src: 'URL1', name: 'First track' },
+    { src: 'URL2', name: 'Second track' }
+  ],
+  startIndex: 1,
+  autoplay: true,
+  loopQueue: true
+  // ...
+})
 ```
 
-Где единица - индекс проигрываемого файла в массиве. В нашем примере проиграется _URL2_.
+Play a track:
 
-Чтобы они переключались автоматически нужно утсновить флаг _autoplay_, сделать это можно двумя способами.
+```js
+audiojs.play() // play current track
+audiojs.play(1) // play track with index 1
+```
 
-**Первый:** изменяем свойство объекта
+To automatically start the next track, set `autoplay=true`:
 
 ```js
 audiojs.autoplay = true
-```
 
-**Второй:** передаём его в конструкторе(оптимальный вариант)
-
-```js
-let audiojs = new AudioJS({
-  queue: ['URL1', 'URL2'],
+// OR
+const audiojs = new AudioJS({
   autoplay: true
+  // ...
 })
 ```
 
-Вы могли заметить, что мы передаём в конструктор уже не массив, а объект. Дело в том, что конструктор **AudioJS** имеет 4 перегрузки:
+Events handling:
 
 ```js
-let audiojs = new AudioJS('FILE_URL')       // URL файла, который надо проиграть.
-let audiojs = new AudioJS(['URL1', 'URL2']) // Массив адрессов очереди.
-let audiojs = new AudioJS({                 // Объект параметраметров.
-  src: 'URL',
-  loopTrack: true
-})
-let audiojs = new AudioJS()                 // Без параметров.
-```
-
-В **AudioJS** есть система _событий_. В следующем примере мы запустим очередь и по её окончанию запустим новую:
-
-```js
-let audiojs = new AudioJS({
-  queue: ['URL1', 'URL2', 'URL3'],     // Очередь.
-  autoplay: true,                      // Автопроигрывание.
-  onQueueEnd: () => {             // Подписка на событие окончания очереди.
-    console.log('Первая очередь закончилась.')
-    audiojs.queue = ['URL4', 'URL5']     // Запускаем вторую очередь.
+const audiojs = new AudioJS({
+  // ...
+  onQueueEnd(event) {
+    console.log('Queue was ended')
+    audiojs.queue = ['URL4', 'URL5']
+    audiojs.play()
+    // event.audiojs.play()
+  },
+  onTrackChange(event) {
+    console.log(event.track.name)
   }
+  // on<event_name>
 })
+
+// OR
+audiojs.on('trackLoad', event => console.log(`Track ${event.track.name} was loaded`))
+audiojs.once('queueEnd', console.log('once queueEnd'))
 ```
 
-Для подписки на события достаточно передать обрабочик в параметрах. Либо с помощью метода **on**:
+Available events:
 
-```js
-audiojs.on('trackStop', () => {
-  console.log('Трек был остановлен.')
-})
-```
-
-Всего событий 7, вот их краткое описание:
-
-* **queueEnd** - вызывается после окончания очереди.
-* **trackPlay** - вызывается после запуска аудиофайла.
-* **trackPause** - вызывается когда аудиофайл поставили на паузу.
-* **trackStop** - вызывается когда аудиофайл был остановлен с помощью метода _stop_.
-* **trackEnd** - вызывается когда аудиофайл закончился.
-* **trackLoad** - вызывается когда аудиофайл загрузился.
-* **changeTime** - вызывается каждую секунду во время проигрывания трека.
-
-## Параметры конструктора
-
-* **src** - URL проигрываемого файла.
-* **queue** - очередь проигрываемых файлов.
-* **index** - индекс, с которого начнётся проигрывание.
-* **autoplay** - флаг автопроигрывания файла.
-* **loopTrack** - флаг повтора аудиофайла.
-* **loopQueue** - флаг повтора очереди.
-* **volume** - значение громкости.
-* **preload** - автозагрузка файла.
-* **time** - время, с которого начнётся проигрываение файла.
-* **on<event_name>** - подписка на событие.
-
-## Методы
-
-В классе есть такие методы, как **play**, **pause**, **stop**, которые управляют проигрываением аудиофайла. Также вы можете переключать проигрываение файла в очереди с помощью **next** и **back**.
-
-Все свойства класса при присвоении проверяют значения на валидность, что помогает вам избавиться от неурядицы с типами, но усложняет поиск ошибок в коде (для улучшения этой ситуации вскоре будет введена система выбрасывания ошибок).
-
-Метод **play** может принимать как позицию (индекс) в очереди, так и полноценный URL в виде строки.
-
-```js
-audiojs.play(1)
-audiojs.play('URL')
-```
-
-**stop** на самом деле сбрасывает текущее время проигрывания на ноль и ставит аудиофайл на паузу, также вызывается событие _trackStop_.
-
-```js
-audiojs.play()
-audiojs.on('trackStop', () => {
-  console.log('Вызван trackStop')
-})
-console.log(audiojs.time) // 20
-audiojs.stop() // Вызван trackstop
-console.log(audiojs.time) // 0
-console.log(audiojs.status == AudioJS.statusType.paused && audiojs.paused == true) // true
-```
-
-Метод **on** имеет флаг _root_, с помощью котрого можно сделать переданный обработчик "корневым", то есть он будет заменять предыдущий обработчик.
-
-```js
-audiojs.play()
-audiojs.on('trackPause', () => {
-  console.log('Первый обработчик')
-})
-audiojs.on('trackPause', () => {
-  console.log('Второй обработчик')
-})
-audiojs.pause() // Первый обработчик \n Второй обработчик
-```
-
-```js
-audiojs.play()
-audiojs.on('trackPause', () => {
-  console.log('Первый обработчик')
-})
-audiojs.on("trackPause", () => {
-  console.log('Второй обработчик')
-}, true)
-audiojs.pause() // Второй обработчик
-```
-
-Если стоит флаг _loopQueue_, то при вызове метода **next** на последнем аудиофайле в очереди будет начато проигрывание с начала.
-
-```js
-audiojs.loopQueue = true
-audiojs.queue = ['URL1', 'URL2']
-audiojs.play(1)
-audiojs.next() // Проигрывается URL1
-console.log(audiojs.index) // 0
-```
-
-В теории с помощью событий можно зациклить код, так что будьте внимательней.
-
-## Свойства
-
-* **status** \['created'|'playing'|'paused'\] - статус проигрывания.
-* **time** \[number\] - аналог *currentTime* у Audio.
-* **duration** \[number\] - аналог *duration* у Audio.
-* **muted** \[bool\] - аналог *muted* у Audio.
-* **src** \[string\] - URL текущего файла.
-* **preload** \[string\] - аналог *preload* у Audio
-* **volume** \[number\] - аналог *volume* у Audio
-* **queue** \[Array of string\] - очередь аудиофайлов.
-* **index** \[number\] - индекс текущего файла в очереди.
-* **loopQueue** \[bool\] - зациклить очередь.
-* **loopTrack** \[bool\] - зациклить трек.
-* **autoplay** \[bool\] - автопроигрывание.
-
-## Примечание
-
-Все предложения и отчёты об ошибках можете писать в **Issues**, приятного использования.
+- queueEnd
+- trackLoad
+- trackChange
+- trackPlay
+- trackPause
+- trackStop
+- trackEnd
+- changeTime

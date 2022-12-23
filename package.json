@@ -1,0 +1,27 @@
+{
+  "name": "vzt-audio",
+  "description": "Library for working with HTML Audio.",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "devDependencies": {
+    "typescript": "^4.9.4"
+  },
+  "scripts": {
+    "compile": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VerZsuT/AudioJS.git"
+  },
+  "keywords": [
+    "audio",
+    "js",
+    "ts"
+  ],
+  "author": "VerZsuT",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/VerZsuT/AudioJS/issues"
+  },
+  "homepage": "https://github.com/VerZsuT/AudioJS#readme"
+}
